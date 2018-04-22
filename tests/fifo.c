@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <sys/poll.h>
 
 #define MAXBUFF 1024
 #define FIFO1   "/tmp/fifo.1"
@@ -18,14 +19,31 @@ int jobExecutor(int *wr){
 	size_t a;
    char *str=NULL;
 	int counter=0;
+	struct pollfd pfds[5];
+
    while(!feof(fp)){
+		for(int i=0;i<5;i++){
+			pfds[i].fd = wr[i];
+			pfds[i].events = POLLOUT;
+		}
+		poll(pfds,5,-1);
+
       int l=getline(&str,&a,fp);
       str[l-1]='\0';
-		if(l>=0)if(write(wr[counter++%5],str,l+1)<=0) perror("write error");
+		if(l>=0 && (pfds[counter%5].revents & POLLOUT))
+			if(write(wr[counter++%5],str,l+1)<=0) perror("write error");
    }
 //	write(wr[0],"Bravo mori panatha",strlen("bravo mori panatha")+1) ;
-	for(int i =0;i<5;i++){
-		write(wr[i],"stop",strlen("stop")+1);
+	poll(pfds,5,-1);
+	for(int i=0;i<5;i++){
+		pfds[i].fd = wr[i];
+		pfds[i].events = POLLOUT;}
+
+		poll(pfds,5,-1);
+for(int i=0;i<5;i++){
+		if(pfds[i].revents & POLLOUT)
+			write(wr[i],"stop",strlen("stop")+2);
+	//	poll(pfds,5,-1);
 	}
 	return 0;
 }
@@ -33,12 +51,19 @@ int jobExecutor(int *wr){
 int worker(int rfd){
 	int n;
 	char buff[256];
+	struct pollfd pfds[1];
+
 	while(1){
+		pfds[0].fd=rfd;
+		pfds[0].events = POLLIN;
+		poll(pfds,1,-1);
+		if(pfds[0].revents & POLLIN){
 		if((n=read(rfd,buff,MAXBUFF))>0){
 			buff[n]='\0';
 			printf(" : %s\n",buff );
 			if(!strcmp(buff,"stop")) return 0;
 		}
+	}
 	}
 	return 0;
 }
