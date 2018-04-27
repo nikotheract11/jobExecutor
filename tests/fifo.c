@@ -8,63 +8,123 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <sys/poll.h>
+#include <time.h>
+#include "../trie.h"
 
 #define MAXBUFF 1024
 #define FIFO1   "/tmp/fifo.1"
 #define FIFO2   "/tmp/fifo.2"
 #define PERMS   0666
 
-int jobExecutor(int *wr){
-	FILE *fp = fopen("./docfile","r");
-	size_t a;
-   char *str=NULL;
-	int counter=0;
-	struct pollfd pfds[5];
 
-   while(!feof(fp)){
-		for(int i=0;i<5;i++){
-			pfds[i].fd = wr[i];
-			pfds[i].events = POLLOUT;
-		}
-		poll(pfds,5,-1);
+pid_t exited;
 
-      int l=getline(&str,&a,fp);
-      str[l-1]='\0';
-		if(l>=0 && (pfds[counter%5].revents & POLLOUT))
-			if(write(wr[counter++%5],str,l+1)<=0) perror("write error");
+/* Insert list node with a path for jobExecutor */
+int insertAtStart(char *p,list **l){
+   if(*l == NULL){
+      (*l) = malloc(sizeof(list));
+      (*l)->path = malloc(strlen(p)+1);
+      strcpy((*l)->path,p);
+      (*l)->next = NULL;
+      return 0;
    }
-//	write(wr[0],"Bravo mori panatha",strlen("bravo mori panatha")+1) ;
-	poll(pfds,5,-1);
-	for(int i=0;i<5;i++){
-		pfds[i].fd = wr[i];
-		pfds[i].events = POLLOUT;}
+   list *tmp = *l;
+   list *new = malloc(sizeof(list));
+   new->path = malloc((strlen(p)+1));
+   strcpy(new->path,p);
+   new->next = tmp;
+   *l = new;
 
-		poll(pfds,5,-1);
-for(int i=0;i<5;i++){
-		if(pfds[i].revents & POLLOUT)
-			write(wr[i],"stop",strlen("stop")+2);
-	//	poll(pfds,5,-1);
+   /*list *i = *l;
+   while(i!=NULL){
+      printf("%s\n",i->path );
+      i = i->next;
+   }*/
+   return 0;
+
+}
+
+void handler(int signum){
+	//for(int i=0;i<)
+	int status;
+	exited = waitpid(-1,&status,WNOHANG);
+
+}
+
+int jobExecutor(int *wr,int *rfd,int w){
+	int fd,n;
+   char str[50],c;
+	int counter=0,j=0;
+	static struct sigaction act;
+
+	sigfillset(&(act.sa_mask));
+	act.sa_handler = handler;
+
+	list **paths;
+	paths = malloc(w*sizeof(list));
+
+
+	if((fd= open("./docfile",0)) < 0) perror("open");
+
+	/* Send paths to workers */
+   while((n=read(fd,&c,1)) > 0){
+		if(c == '\n') {
+			str[j] = '\0';
+			if(write(wr[counter%w],str,j+1)<=0) perror("write error");
+			insertAtStart(str,&paths[counter++%w]);
+			j=0;
+		}
+		else str[j++] = c;
+   }
+
+	/* All paths have been sent, now send STOP to let them know */
+	for(int i=0;i<w;i++){
+		write(wr[i],"stop",w);
 	}
+
+	/* Here comes the user interface */
+//	interface(wr,rfd,w);
+
+
+
 	return 0;
 }
 
-int worker(int rfd){
-	int n;
-	char buff[256];
-	struct pollfd pfds[1];
 
+
+int worker(int rfd,int wfd){
+	int n;
+	char buff[1024];
+   char s[32];
+   time_t arrival;
+   //int ar_flag=1;
+   sprintf(s,"worker%d",getpid());
+   fp = fopen(s,"a");
+
+   fprintf(fp, "%s\n","kalisperaa ");
+
+	while((n=read(rfd,buff,MAXBUFF)) > 0){
+		/* Here open files, create map and trie */
+		if(!strcmp(buff,"stop")) return 0;
+		printf("worker%d : %s\n",getpid(),buff );
+	}
+
+	/* Now, that files are read, read the query */
 	while(1){
-		pfds[0].fd=rfd;
-		pfds[0].events = POLLIN;
-		poll(pfds,1,-1);
-		if(pfds[0].revents & POLLIN){
-		if((n=read(rfd,buff,MAXBUFF))>0){
-			buff[n]='\0';
-			printf(" : %s\n",buff );
-			if(!strcmp(buff,"stop")) return 0;
-		}
+		/* Tokenize buffer, read the first token to execute the query */
+      char *query= readMsg(&rfd,1);
+      arrival = time(NULL);
+      char * c_time = ctime(&arrival);
+      int argc;
+      char **tokens = getok(query,&argc);    // break query to tokens
+      char *reply;
+      reply = operate(tokens,argc,c_time);       // delete k
+      printf("%s\n",reply );
+      sendMsg(reply,&wfd,1);
 	}
-	}
+
+	/* Compose reply to jobExecutor with the results */
+
 	return 0;
 }
 
@@ -119,25 +179,26 @@ int main(){
 			perror("fork:failed");
 		}
 	}
-	if(p==0) worker(read_fd);
-else {
-	jobExecutor(writefd);
-	for(int i=0;i<5;i++){
+	if(p==0) {
+		worker(read_fd,write_fd);
+		return 0;
+	}
+ else {
+	jobExecutor(writefd,readfd,w);
+	for(int i=0;i<w;i++){
 		char fifo_1[32],fifo_2[32];
 		int status;
 
 		sprintf(fifo_1,"/tmp/fifo1_%d",i);
 		sprintf(fifo_2,"/tmp/fifo2_%d",i);
-
 		waitpid(workers[i],&status,0);
-
-
 		close(writefd[i]);
 		close(readfd[i]);
-
 		unlink(fifo_1);
 		unlink(fifo_2);
 	}
 }
-   exit(0);
+close(write_fd);
+close(read_fd);
+   return 0;
 }

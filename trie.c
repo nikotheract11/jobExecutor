@@ -8,11 +8,12 @@
 /*
  * create a p_list node
 */
-int p_init(p_list ** p,int text_id,int freq){
+int p_init(p_list ** p,int text_id,int line){
    *p = (p_list*) malloc(sizeof(p_list));
    (*p)->next = NULL;
    (*p)->text_id = text_id;
-   (*p)->freq = freq;
+   (*p)->freq = 1;
+   (*p)->line = line;
    (*p)->plen = 0;
    return 0;
 }
@@ -20,12 +21,12 @@ int p_init(p_list ** p,int text_id,int freq){
 /*
  * add a p_list node to trie
 */
-int addplist(t_node **t,int text_id){
+int addplist(t_node **t,int text_id,int line){
    t_node *tmp = *t;
 
    // if this word, found for first time, plist = NULL
    if(tmp->plist == NULL) {
-      p_init(&(tmp->plist),text_id,1);
+      p_init(&(tmp->plist),text_id,line);
       (tmp->plist->plen)++;
       return 0;
    }
@@ -34,14 +35,14 @@ int addplist(t_node **t,int text_id){
    else{
       p_list *p = tmp->plist;
       while (p != NULL){
-         if(p->text_id == text_id) {
+         if(p->text_id == text_id && p->line == line) {     //=========== swsto?????
             (p->freq)++;
             return 0;
          }
 
          // if text_id not in the list
          if(p->next == NULL) {
-            p_init(&(p->next),text_id,1);
+            p_init(&(p->next),text_id,line);
             (tmp->plist->plen)++;
             break;
          }
@@ -66,7 +67,7 @@ int t_init(t_node ** t){
 /*
  * This function appends a key to trie t
 */
-int append(t_node **t,const char *key,int text_id){
+int append(t_node **t,const char *key,int text_id,int line){
    unsigned int i=0;
    t_node *tmp = *t;
    while(i<(strlen(key)) ){
@@ -80,7 +81,7 @@ int append(t_node **t,const char *key,int text_id){
    }
 
    //add a plist for the key
-   addplist(&tmp,text_id);
+   addplist(&tmp,text_id,line);
    return 0;
 }
 
@@ -88,7 +89,7 @@ int append(t_node **t,const char *key,int text_id){
  * This functions inserts key with text_id to trie t
 */
 
-int insert( const char* key, int text_id){
+int insert( const char* key, int text_id,int line){
    t_node *tmp = t;
    unsigned int i = 0;
 
@@ -96,7 +97,7 @@ int insert( const char* key, int text_id){
    if(t == NULL) {
       t_init(&t);
       tmp = t;
-      append(&tmp,key,text_id);
+      append(&tmp,key,text_id,line);
       return 22;
    }
    if(strlen(key) <= 0) return 0;
@@ -112,13 +113,13 @@ int insert( const char* key, int text_id){
       if(key[i] != tmp->value){
             t_init(&(tmp->sibling));
             tmp = tmp->sibling;
-            append(&tmp,&(key[i]),text_id);
+            append(&tmp,&(key[i]),text_id,line);
             return 3;
       }
 
       // key in trie, increase frequency
       if(i == (strlen(key) - 1) ) {
-         addplist(&tmp,text_id);
+         addplist(&tmp,text_id,line);
          return 0;
       }
 
@@ -126,7 +127,7 @@ int insert( const char* key, int text_id){
       if(tmp->child != NULL && i < (strlen(key) -1)) tmp = tmp->child;
 
       else {
-         append(&tmp,&(key[i]),text_id);
+         append(&tmp,&(key[i]),text_id,line);
          return 88;
       }
    }

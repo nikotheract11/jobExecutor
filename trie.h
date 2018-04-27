@@ -12,16 +12,28 @@
 
 
 /*uint N;     // Number of texts
-uint *D;    // Array with the number of words from each text
+uint *D; */   // Array with the number of words from each text
 struct t_node *t;  // Trie root node
-char **str; // the map to the texts
-*/
+char ***str; // the map to the texts
+char **files; // paths for each worker
+
+FILE *fp; // log file
+
 
 struct t_node *t;  // Trie root node
+
+struct list{
+   char *path;
+   struct list *next;
+};
+
+typedef struct list list;
+
+int insertAtStart(char *p,list **l);
 
 struct pair {     // A struct using to store id and score in the heap
    int text_id;
-   double score;
+   int score;
 };
 
 struct st {    // A struct to store position and length of words for nice print
@@ -48,6 +60,13 @@ struct t_node {   // this is a trie node
 
 };
 
+struct query {
+   char *operation;
+   char **args;
+   int argc;
+};
+
+typedef struct query query;
 typedef struct pair pair;
 typedef struct t_node t_node;
 typedef struct p_list p_list;
@@ -58,9 +77,9 @@ int p_init(p_list **,int ,int );
 int t_init(t_node **);
 int get_terminal_width();
 void pr(char *,char **,int,int,int);
-int addplist(t_node **, int );
-int append(t_node **,const char *,int);
-int insert(const char *,int);
+int addplist(t_node **, int ,int);
+int append(t_node **,const char *,int,int);
+int insert(const char *,int,int);
 char** get(const char*);
 int getLinesNumber(FILE *);
 int pr_trie(t_node *,char *,int );
@@ -79,7 +98,13 @@ int mygetopt(int , char * const arg[], int *,char **);
 double avgdl();
 double idf(int);
 double score(int n,p_list *);
-int interface(int);
+int interface(int*,int*,int);
 int digit_precision();
+char * search(char** s,int j,char *k);
+char * operate(char **,int,char *);
+char * readMsg(int *rfd,int w);
+int sendMsg(char *buf,int *wr,int w);
+char **getok(char* s,int *k);
+int wc(char ***s);
 
 #endif

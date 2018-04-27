@@ -11,5 +11,6 @@ int main(int argc, char const *argv[]) {
       str[l-1]='\0';
       printf("%s\n",str );
    }
+   
    return 0;
 }
