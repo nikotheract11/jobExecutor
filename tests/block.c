@@ -32,5 +32,4 @@ int main(){
          perror("server: can't open write fifo");
       }
    }
-   printf("SKATAAAA\n");
 }
